@@ -1,0 +1,7 @@
+[package]
+name = "dmm3d"
+version = "0.1.0"
+edition = "2021"
+description = "Dependency-free SS13 DMM/TGM to 3D OBJ converter"
+
+[dependencies]

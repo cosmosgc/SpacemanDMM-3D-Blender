@@ -1,0 +1,11 @@
+"a" = (/turf/closed/wall,/area/station/hallway)
+"b" = (/turf/open/floor/plating,/area/station/hallway)
+"c" = (/turf/open/floor/plating,/obj/machinery/door/airlock{dir = 4},/area/station/hallway)
+"d" = (/turf/open/floor/plating,/obj/structure/window,/area/station/hallway)
+"e" = (/turf/open/floor/plating,/obj/structure/table,/area/station/hallway)
+(1,1,1) = {"
+aaaaa
+abbba
+adcba
+abeba
+"}

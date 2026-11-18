@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SpacemanDMM Blender 3D Maps</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #090d14; color: #e8edf5; }
+    #view { position: fixed; inset: 0; }
+    canvas { display: block; }
+    .panel { position: fixed; z-index: 2; background: #101722eF; border: 1px solid #283447; border-radius: 12px; box-shadow: 0 12px 40px #0007; backdrop-filter: blur(12px); }
+    #top { top: 16px; left: 16px; display: flex; align-items: center; gap: 10px; padding: 10px 12px; }
+    .brand { font-size: 13px; font-weight: 750; letter-spacing: .08em; color: #9db4d4; text-transform: uppercase; margin-right: 3px; }
+    select, button { color: #edf3fc; border: 1px solid #34445b; background: #1a2636; border-radius: 8px; padding: 9px 11px; font: inherit; }
+    select { min-width: 190px; }
+    label.mode { display:flex; align-items:center; gap:7px; color:#c7d2e2; font-size:12px; white-space:nowrap; cursor:pointer; }
+    label.mode input { accent-color:#63d4b2; width:15px; height:15px; }
+    label.mode:has(input:disabled) { opacity:.45; cursor:not-allowed; }
+    button { cursor: pointer; font-weight: 650; }
+    button:hover { background: #26364b; }
+    button.active { border-color: #63d4b2; background: #164638; color: #c6ffed; }
+    #info { top: 16px; right: 16px; max-width: 290px; padding: 12px 14px; font-size: 12px; line-height: 1.55; color: #bdc9d9; }
+    #info strong { display: block; color: #f4f7fb; font-size: 14px; margin-bottom: 4px; }
+    #hint { left: 50%; bottom: 22px; transform: translateX(-50%); width: max-content; max-width: calc(100% - 32px); text-align: center; padding: 10px 14px; font-size: 12px; color: #d1d9e5; }
+    #status { color: #9eacc0; }
+    #crosshair { display:none; position:fixed; z-index:1; left:50%; top:50%; width:5px; height:5px; margin:-2.5px; border-radius:50%; background:#fff; box-shadow:0 0 5px #000; pointer-events:none; }
+    body.mouse-locked #crosshair { display:block; }
+    #error { display:none; position:fixed; z-index:5; inset:auto 16px 16px; color:#ffd3d3; background:#401b24; border:1px solid #7f3340; border-radius:8px; padding:12px; }
+    @media(max-width:1050px) { #info { top:auto; bottom:86px; left:16px; right:16px; max-width:none; } }
+    @media(max-width:650px) { #top { right:16px; flex-wrap:wrap; } .brand { width:100%; } select { flex:1; min-width:0; } #hint { bottom:14px; font-size:11px; } }
+  </style>
+</head>
+<body>
+  <div id="view"></div>
+  <div id="crosshair"></div>
+  <header id="top" class="panel">
+    <span class="brand">SpacemanDMM · 3D Maps</span>
+    <select id="maps" aria-label="Choose map"><option>Loading maps…</option></select>
+    <label class="mode" title="Uses a separately generated merged-entity copy; high-fidelity files are not changed">
+      <input id="performance-mode" type="checkbox" disabled>
+      Performance mode
+    </label>
+    <button id="walk" type="button" aria-pressed="false" disabled>Walk mode</button>
+    <button id="fly" type="button" aria-pressed="false" disabled>Fly mode</button>
+    <button id="home" type="button" title="Reset camera">Reset view</button>
+  </header>
+  <aside id="info" class="panel"><strong id="map-name">Map viewer</strong><span id="map-detail">Loading available map exports…</span></aside>
+  <div id="hint" class="panel"><span id="hint-text">Drag to orbit · scroll to zoom · right-drag to pan</span></div>
+  <div id="error"></div>
+
+  <script type="importmap">
+    { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.166.1/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.166.1/examples/jsm/", "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.8.3/build/index.module.js" } }
+  </script>
+  <script type="module">
+    import * as THREE from "three";
+    import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+    import { disposeMapResources, indexTerrain } from "./viewer_resources.js";
+
+    const rootUrl = new URL("./output/", location.href);
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x090d14);
+    scene.fog = new THREE.Fog(0x090d14, 120, 420);
+    const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.05, 1200);
+    camera.up.set(0, 1, 0);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    document.querySelector("#view").appendChild(renderer.domElement);
+    scene.add(new THREE.HemisphereLight(0xc8dcff, 0x20202a, 2.2));
+    const keyLight = new THREE.DirectionalLight(0xffe4c1, 2.2);
+    keyLight.position.set(-80, 120, 65);
+    scene.add(keyLight);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.075;
+    controls.maxPolarAngle = Math.PI * 0.495;
+    controls.minDistance = 2;
+    controls.maxDistance = 700;
+    const loader = new GLTFLoader();
+    const mapSelect = document.querySelector("#maps");
+    const performanceToggle = document.querySelector("#performance-mode");
+    const info = document.querySelector("#map-detail");
+    const errorBox = document.querySelector("#error");
+    const walkButton = document.querySelector("#walk");
+    const flyButton = document.querySelector("#fly");
+    const hint = document.querySelector("#hint-text");
+    const walkHeight = 1.65;
+    let model = null, modelBox = null, walkSpawn = null, viewMode = "orbit", loadId = 0;
+    let floorMeshes = [], wallMeshes = [];
+    let mapAsset = null, mapDownload = null, indexedModel = null;
+    let bvhModule;
+    let yaw = 0, pitch = 0, velocityY = 0, onGround = false, lastFrame = performance.now();
+    const pressed = new Set();
+    const downRay = new THREE.Raycaster();
+    const forwardRay = new THREE.Raycaster();
+    const forward = new THREE.Vector3();
+    const right = new THREE.Vector3();
+    const move = new THREE.Vector3();
+    const down = new THREE.Vector3(0, -1, 0);
+    const rayOrigin = new THREE.Vector3();
+    const rayDirection = new THREE.Vector3();
+    const hitNormal = new THREE.Vector3();
+    const rayHits = [];
+    const keys = new Set(["KeyW","KeyA","KeyS","KeyD","Space","ShiftLeft","ShiftRight","KeyQ"]);
+
+    function showError(message) { errorBox.textContent = message; errorBox.style.display = "block"; }
+    function hideError() { errorBox.style.display = "none"; }
+    function setStatus(text) { info.textContent = text; }
+
+    function cameraHome() {
+      if (!modelBox) return;
+      const size = modelBox.getSize(new THREE.Vector3());
+      const center = modelBox.getCenter(new THREE.Vector3());
+      const span = Math.max(size.x, size.z, 12);
+      controls.target.copy(center);
+      camera.position.set(center.x + span * 0.82, center.y + span * 0.75, center.z + span * 0.82);
+      camera.lookAt(center);
+      controls.update();
+    }
+
+    function releaseMap() {
+      if (mapAsset) disposeMapResources(mapAsset.scenes);
+      mapAsset = model = modelBox = walkSpawn = indexedModel = null;
+      floorMeshes = [];
+      wallMeshes = [];
+      rayHits.length = 0;
+    }
+
+    async function loadMap(entry) {
+      const request = ++loadId;
+      mapDownload?.abort();
+      const download = new AbortController();
+      mapDownload = download;
+      hideError();
+      setMode("orbit");
+      walkButton.disabled = flyButton.disabled = true;
+      document.querySelector("#map-name").textContent = entry.name;
+      const usePerformance = performanceToggle.checked && Boolean(entry.performance_url);
+      const modelPath = usePerformance ? entry.performance_url : entry.url;
+      setStatus(usePerformance ? "Loading performance copy…" : "Loading high-fidelity model…");
+      releaseMap();
+      try {
+        const url = new URL(modelPath, rootUrl);
+        const response = await fetch(url, { signal: download.signal });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const bytes = await response.arrayBuffer();
+        if (request !== loadId) return;
+        const gltf = await loader.parseAsync(bytes, new URL(".", response.url || url).href);
+        if (request !== loadId) {
+          disposeMapResources(gltf.scenes);
+          return;
+        }
+        mapAsset = gltf;
+        model = gltf.scene;
+        // These DMI textures are pixel-art cutouts rather than glass. Alpha
+        // blending sorts whole meshes and causes coplanar sprites to flicker or
+        // show objects behind them as the camera angle changes. Alpha-test them
+        // instead so opaque pixels write depth and transparent pixels are cut out.
+        model.traverse(object => {
+          if (!object.isMesh) return;
+          const materials = Array.isArray(object.material) ? object.material : [object.material];
+          for (const material of materials) {
+            if (!material?.transparent || /^DMM[ _]Glazing\b/i.test(material.name)) continue;
+            material.alphaTest = Math.max(material.alphaTest || 0, 0.12);
+            material.transparent = false;
+            material.depthWrite = true;
+            material.needsUpdate = true;
+          }
+        });
+        // glTF uses Y-up; Blender's glTF exporter handles its Z-up conversion.
+        scene.add(model);
+        model.updateMatrixWorld(true);
+        modelBox = new THREE.Box3().setFromObject(model);
+        findStationTerrain();
+        walkButton.disabled = !walkSpawn;
+        flyButton.disabled = false;
+        cameraHome();
+        const mode = modelPath === entry.performance_url ? "performance" : "high fidelity";
+        setStatus(`${Math.round(modelBox.getSize(new THREE.Vector3()).x)} × ${Math.round(modelBox.getSize(new THREE.Vector3()).z)} tiles · ${mode}`);
+      } catch (error) {
+        if (request !== loadId) return;
+        releaseMap();
+        walkButton.disabled = flyButton.disabled = true;
+        console.error(error);
+        setStatus("Could not load this GLB export.");
+        showError(`Failed to load ${entry.name}. Check that the GLB exists and is served over HTTP. ${error.message || error}`);
+      } finally {
+        if (mapDownload === download) mapDownload = null;
+      }
+    }
+
+    async function discoverMaps() {
+      try {
+        const response = await fetch(new URL("maps.json", rootUrl), { cache: "no-store" });
+        if (!response.ok) throw new Error(`maps.json returned HTTP ${response.status}`);
+        const data = await response.json();
+        const maps = (data.maps || []).filter(item => item.name && item.url);
+        if (!maps.length) throw new Error("No GLB exports found in output/maps.json");
+        mapSelect.replaceChildren(...maps.map((entry, i) => {
+          const option = document.createElement("option");
+          option.value = String(i);
+          option.textContent = entry.name;
+          return option;
+        }));
+        mapSelect._maps = maps;
+        mapSelect.addEventListener("change", () => loadMap(maps[Number(mapSelect.value)]));
+        performanceToggle.disabled = !maps.some(item => item.performance_url);
+        performanceToggle.addEventListener("change", () => {
+          const selected = maps[Number(mapSelect.value)];
+          if (selected) loadMap(selected);
+        });
+        const requested = new URL(location.href).searchParams.get("map");
+        const initial = Math.max(0, maps.findIndex(item => item.name.toLowerCase() === (requested || "").toLowerCase()));
+        mapSelect.value = String(initial);
+        await loadMap(maps[initial]);
+      } catch (error) {
+        console.error(error);
+        mapSelect.replaceChildren(new Option("Map list unavailable", ""));
+        setStatus("Could not discover exports.");
+        showError(`Can't read ${new URL("maps.json", rootUrl)}. Serve this project over HTTP and make sure output/maps.json exists. ${error.message || error}`);
+      }
+    }
+
+    function findStationTerrain() {
+      const terrain = { floor: [], plating: [], asteroid: [], wall: [] };
+      model.traverse(object => {
+        if (!object.isMesh) return;
+        // GLTFLoader may put material primitives under a named group.
+        for (let node = object; node && node !== model; node = node.parent) {
+          const match = /^(floor|plating|asteroid|wall)[ _]tiles(?:$|[_. ])/i.exec(node.name);
+          if (!match) continue;
+          terrain[match[1].toLowerCase()].push(object);
+          break;
+        }
+      });
+      floorMeshes = [...terrain.floor, ...terrain.plating, ...terrain.asteroid];
+      wallMeshes = terrain.wall;
+
+      const candidates = [terrain.floor, terrain.plating, terrain.asteroid].find(meshes => meshes.length);
+      if (!candidates) return;
+      const bounds = new THREE.Box3();
+      for (const mesh of candidates) bounds.expandByObject(mesh);
+      const center = bounds.getCenter(new THREE.Vector3());
+      const point = new THREE.Vector3();
+      const vertex = new THREE.Vector3();
+      let bestScore = Infinity;
+      for (const mesh of candidates) {
+        const { index, attributes: { position } } = mesh.geometry;
+        const count = index ? index.count : position.count;
+        // Pick a point inside a real floor triangle. The bounding-box center
+        // alone could be a wall or a hole between station wings.
+        for (let i = 0; i + 2 < count; i += 3) {
+          point.set(0, 0, 0);
+          for (let j = i; j < i + 3; j++) {
+            point.add(vertex.fromBufferAttribute(position, index ? index.getX(j) : j));
+          }
+          point.multiplyScalar(1 / 3).applyMatrix4(mesh.matrixWorld);
+          if (point.y > bounds.min.y + 0.1) continue;
+          const score = (point.x - center.x) ** 2 + (point.z - center.z) ** 2;
+          if (score >= bestScore) continue;
+          bestScore = score;
+          walkSpawn = point.clone();
+        }
+      }
+    }
+
+    function syncOrientation() {
+      camera.rotation.set(pitch, yaw, 0, "YXZ");
+    }
+
+    function resetCamera() {
+      if (!modelBox) return;
+      if (viewMode === "orbit") return cameraHome();
+      yaw = 0;
+      velocityY = 0;
+      if (viewMode === "walk") {
+        camera.position.copy(walkSpawn);
+        camera.position.y += walkHeight;
+        pitch = 0;
+        onGround = true;
+      } else {
+        camera.position.copy(walkSpawn || modelBox.getCenter(new THREE.Vector3()));
+        camera.position.y = Math.max(modelBox.max.y, camera.position.y) + 8;
+        pitch = -0.45;
+      }
+      syncOrientation();
+    }
+
+    const mouseLocked = () => document.pointerLockElement === renderer.domElement;
+
+    function updateHint() {
+      const locked = viewMode !== "orbit" && mouseLocked();
+      document.body.classList.toggle("mouse-locked", locked);
+      if (viewMode === "orbit") {
+        hint.textContent = "Drag to orbit · scroll to zoom · right-drag to pan";
+      } else {
+        const actions = viewMode === "walk" ? "WASD move · Shift sprint · Space jump"
+          : "WASD fly · Shift boost · Space rise · Q descend";
+        hint.textContent = locked ? `Mouse look · ${actions} · Esc releases mouse`
+          : `Click the map to capture the mouse · ${actions}`;
+      }
+    }
+
+    async function captureMouse() {
+      if (viewMode === "orbit" || mouseLocked()) return;
+      try { await renderer.domElement.requestPointerLock?.(); }
+      catch { updateHint(); }
+    }
+
+    async function prepareCollision(asset) {
+      if (!asset || indexedModel === asset) return;
+      try {
+        bvhModule ??= import("three-mesh-bvh");
+        const { MeshBVH, acceleratedRaycast } = await bvhModule;
+        if (model !== asset || indexedModel === asset) return;
+        indexTerrain([...floorMeshes, ...wallMeshes], MeshBVH, acceleratedRaycast);
+        indexedModel = asset;
+      } catch (error) {
+        // Keep native raycasting available if the optional CDN module fails.
+        if (model === asset && indexedModel !== asset) {
+          indexedModel = asset;
+          console.warn("Could not accelerate terrain collision", error);
+        }
+      }
+    }
+
+    function setMode(mode) {
+      if (mode !== "orbit" && (!model || (mode === "walk" && !walkSpawn))) return;
+      const previous = viewMode;
+      viewMode = mode;
+      pressed.clear();
+      controls.enabled = mode === "orbit";
+      for (const [button, name] of [[walkButton, "walk"], [flyButton, "fly"]]) {
+        button.classList.toggle("active", mode === name);
+        button.setAttribute("aria-pressed", String(mode === name));
+      }
+      if (mode !== previous && !(previous === "walk" && mode === "fly")) resetCamera();
+      if (mode === "walk") prepareCollision(model);
+      if (mode === "orbit" && mouseLocked()) document.exitPointerLock();
+      updateHint();
+    }
+
+    for (const [button, mode] of [[walkButton, "walk"], [flyButton, "fly"]]) {
+      button.addEventListener("click", () => {
+        setMode(viewMode === mode ? "orbit" : mode);
+        captureMouse();
+      });
+    }
+    document.querySelector("#home").addEventListener("click", resetCamera);
+    renderer.domElement.addEventListener("click", captureMouse);
+    document.addEventListener("pointerlockchange", () => {
+      pressed.clear();
+      updateHint();
+    });
+    document.addEventListener("mousemove", event => {
+      if (viewMode === "orbit" || !mouseLocked()) return;
+      yaw -= event.movementX * 0.0022;
+      pitch = THREE.MathUtils.clamp(pitch - event.movementY * 0.0022, -1.35, 1.35);
+      syncOrientation();
+    });
+    document.addEventListener("keydown", event => {
+      if (viewMode !== "orbit" && mouseLocked() && keys.has(event.code)) {
+        event.preventDefault();
+        pressed.add(event.code);
+      }
+    });
+    document.addEventListener("keyup", event => pressed.delete(event.code));
+    window.addEventListener("blur", () => pressed.clear());
+
+    function firstPersonStep(delta) {
+      if (viewMode === "orbit" || !model || !mouseLocked()) return;
+      delta = Math.min(delta, 0.05);
+      forward.set(-Math.sin(yaw), 0, -Math.cos(yaw));
+      right.set(-forward.z, 0, forward.x);
+      const flying = viewMode === "fly";
+      if (flying) forward.multiplyScalar(Math.cos(pitch)).setY(Math.sin(pitch));
+      move.set(0, 0, 0);
+      if (pressed.has("KeyW")) move.add(forward);
+      if (pressed.has("KeyS")) move.sub(forward);
+      if (pressed.has("KeyD")) move.add(right);
+      if (pressed.has("KeyA")) move.sub(right);
+      const fast = pressed.has("ShiftLeft") || pressed.has("ShiftRight");
+      if (flying) {
+        move.y += Number(pressed.has("Space")) - Number(pressed.has("KeyQ"));
+        camera.position.addScaledVector(move.normalize(), (fast ? 24 : 9) * delta);
+        return;
+      }
+      if (onGround && !move.lengthSq() && !pressed.has("Space")) return;
+      if (move.lengthSq()) {
+        move.normalize().multiplyScalar((fast ? 7 : 4) * delta);
+        // Simple wall collision: reject a step if a chest-height ray meets geometry nearby.
+        rayOrigin.copy(camera.position);
+        rayOrigin.y -= 0.55;
+        forwardRay.set(rayOrigin, rayDirection.copy(move).normalize());
+        forwardRay.far = Math.max(0.38, move.length() + 0.24);
+        rayHits.length = 0;
+        const blocked = forwardRay.intersectObjects(wallMeshes, false, rayHits).some(hit => {
+          if (!hit.face) return true;
+          return Math.abs(hitNormal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).y) < 0.65;
+        });
+        if (!blocked) camera.position.add(move);
+      }
+      if (pressed.has("Space") && onGround) { velocityY = 5.1; onGround = false; }
+      velocityY -= 13 * delta;
+      camera.position.y += velocityY * delta;
+      downRay.set(camera.position, down);
+      downRay.far = walkHeight + Math.max(0, -velocityY * delta) + 0.35;
+      rayHits.length = 0;
+      const floor = downRay.intersectObjects(floorMeshes, false, rayHits).find(hit => {
+        if (!hit.face) return false;
+        return hitNormal.copy(hit.face.normal).transformDirection(hit.object.matrixWorld).y > 0.55;
+      });
+      if (floor) {
+        const floorCameraY = floor.point.y + walkHeight;
+        if (camera.position.y <= floorCameraY) {
+          camera.position.y = floorCameraY;
+          velocityY = 0;
+          onGround = true;
+        } else onGround = false;
+      } else {
+        onGround = false;
+        if (camera.position.y < modelBox.min.y - 8) resetCamera();
+      }
+    }
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+      const delta = (now - lastFrame) / 1000;
+      lastFrame = now;
+      firstPersonStep(delta);
+      if (viewMode === "orbit") controls.update();
+      renderer.render(scene, camera);
+    }
+    addEventListener("resize", () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+    discoverMaps();
+    requestAnimationFrame(animate);
+  </script>
+</body>
+</html>

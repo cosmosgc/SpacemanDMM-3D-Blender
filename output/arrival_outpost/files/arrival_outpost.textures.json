@@ -1,0 +1,40 @@
+{
+  "source_dmm": "C:\\Servers\\ss13\\Bubberstation-c\\_maps\\shuttles\\skyrat\\arrival_outpost.dmm",
+  "codebase": "C:\\Servers\\ss13\\Bubberstation-c",
+  "map_switch": "map",
+  "cells": 119,
+  "z_levels": [
+    1
+  ],
+  "textured_turfs": 119,
+  "fallback_turfs": 0,
+  "textured_objects": 44,
+  "door_and_window_geometry": 5,
+  "organize_by": "area",
+  "fallback_objects": 0,
+  "objects_skipped": 24,
+  "underfloor_objects": 0,
+  "dmi_files": [
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\effects\\docking_ports.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\chairs.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\lighting.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\machines\\wallmounts.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\smooth_structures\\table.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\storage\\closet.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\storage\\medkit.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\turf\\floors.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\turf\\shuttle.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_skyrat\\modules\\aesthetics\\intercom\\icons\\intercom.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_zubbers\\icons\\turf\\floors\\floors.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_zubbers\\icons\\turf\\walls\\shuttle_wall.dmi"
+  ],
+  "fallback_types": {},
+  "fallback_object_types": {},
+  "scene_lighting": {
+    "sun": true,
+    "area_lights": 1,
+    "game_fixtures": 6,
+    "overview_camera": true
+  },
+  "proxy_geometry_hidden_by_default": true
+}

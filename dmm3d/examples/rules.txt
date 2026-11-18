@@ -1,0 +1,6 @@
+# Longest matching BYOND path prefix wins.
+/turf/closed/wall=wall
+/turf/open/floor=floor
+/obj/machinery/door=door
+/obj/structure/window=window
+/obj/structure/table=table

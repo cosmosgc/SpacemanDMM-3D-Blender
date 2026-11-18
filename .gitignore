@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Blender autosave/backup copies (the saved .blend projects are tracked)
+*.blend1
+*.blend2
+
+# Rust prototype build output
+dmm3d/target/
+
+# OS and editor clutter
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

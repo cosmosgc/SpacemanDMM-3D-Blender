@@ -1,0 +1,60 @@
+{
+  "source_dmm": "C:\\Servers\\ss13\\Bubberstation-c\\_maps\\virtual_domains\\clown_planet.dmm",
+  "codebase": "C:\\Servers\\ss13\\Bubberstation-c",
+  "map_switch": "map",
+  "cells": 1452,
+  "z_levels": [
+    1
+  ],
+  "textured_turfs": 1446,
+  "fallback_turfs": 6,
+  "textured_objects": 641,
+  "door_and_window_geometry": 1,
+  "organize_by": "area",
+  "fallback_objects": 0,
+  "objects_skipped": 45,
+  "underfloor_objects": 333,
+  "dmi_files": [
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\effects\\bitrunning.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\effects\\blood.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\effects\\dirt_misc.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\effects\\tomatodecal.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\effects\\web.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\mob\\rideables\\mecha.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\art\\horn.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\art\\statue.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\clothing\\shoes.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\drinks\\bottles.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\economy.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\lighting.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\medical\\chemical.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\mining.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\pipes_n_cables\\disposal.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\service\\bureaucracy.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\service\\hydroponics\\harvest.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\service\\janitor.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\smooth_structures\\glass_table.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\smooth_structures\\table.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\storage\\crates.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\weapons\\guns\\magic.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\turf\\decals.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\turf\\floors.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\turf\\floors\\carpet.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\turf\\floors\\lava.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_skyrat\\modules\\aesthetics\\airlock\\icons\\airlocks\\station\\bananium.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_skyrat\\modules\\aesthetics\\disposals\\icons\\disposals.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_zubbers\\icons\\turf\\floors\\floors.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_zubbers\\icons\\turf\\walls\\reinforced_wall.dmi"
+  ],
+  "fallback_types": {
+    "/turf/closed/mineral/bananium": 6
+  },
+  "fallback_object_types": {},
+  "scene_lighting": {
+    "sun": true,
+    "area_lights": 1,
+    "game_fixtures": 18,
+    "overview_camera": true
+  },
+  "proxy_geometry_hidden_by_default": true
+}

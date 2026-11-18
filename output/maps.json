@@ -1,0 +1,144 @@
+{
+  "maps": [
+    {
+      "name": "arrival_delta",
+      "url": "arrival_delta/files/arrival_delta.performance.glb",
+      "performance_url": "arrival_delta/files/arrival_delta.performance.glb"
+    },
+    {
+      "name": "arrival_outpost",
+      "url": "arrival_outpost/files/arrival_outpost.performance.glb",
+      "performance_url": "arrival_outpost/files/arrival_outpost.performance.glb"
+    },
+    {
+      "name": "biodome",
+      "url": "biodome/files/biodome.performance.glb",
+      "performance_url": "biodome/files/biodome.performance.glb"
+    },
+    {
+      "name": "blackmesa",
+      "url": "blackmesa/files/blackmesa.performance.glb",
+      "performance_url": "blackmesa/files/blackmesa.performance.glb"
+    },
+    {
+      "name": "Blueshift",
+      "url": "Blueshift/files/Blueshift.performance.glb",
+      "performance_url": "Blueshift/files/Blueshift.performance.glb"
+    },
+    {
+      "name": "BoxStation",
+      "url": "BoxStation/files/BoxStation.performance.glb",
+      "performance_url": "BoxStation/files/BoxStation.performance.glb"
+    },
+    {
+      "name": "cargo_box",
+      "url": "cargo_box/files/cargo_box.performance.glb",
+      "performance_url": "cargo_box/files/cargo_box.performance.glb"
+    },
+    {
+      "name": "cargo_pubby",
+      "url": "cargo_pubby/files/cargo_pubby.performance.glb",
+      "performance_url": "cargo_pubby/files/cargo_pubby.performance.glb"
+    },
+    {
+      "name": "CentCom",
+      "url": "CentCom/files/CentCom.performance.glb",
+      "performance_url": "CentCom/files/CentCom.performance.glb"
+    },
+    {
+      "name": "clown_planet",
+      "url": "clown_planet/files/clown_planet.performance.glb",
+      "performance_url": "clown_planet/files/clown_planet.performance.glb"
+    },
+    {
+      "name": "DeltaStation2",
+      "url": "DeltaStation2/files/DeltaStation2.performance.glb",
+      "performance_url": "DeltaStation2/files/DeltaStation2.performance.glb"
+    },
+    {
+      "name": "heretic",
+      "url": "heretic/files/heretic.performance.glb",
+      "performance_url": "heretic/files/heretic.performance.glb"
+    },
+    {
+      "name": "infiltrator_advanced",
+      "url": "infiltrator_advanced/files/infiltrator_advanced.performance.glb",
+      "performance_url": "infiltrator_advanced/files/infiltrator_advanced.performance.glb"
+    },
+    {
+      "name": "Lavaland",
+      "url": "Lavaland/files/Lavaland.performance.glb",
+      "performance_url": "Lavaland/files/Lavaland.performance.glb"
+    },
+    {
+      "name": "MetaStation",
+      "url": "MetaStation/files/MetaStation.performance.glb",
+      "performance_url": "MetaStation/files/MetaStation.performance.glb"
+    },
+    {
+      "name": "moonstation",
+      "url": "moonstation/files/moonstation.performance.glb",
+      "performance_url": "moonstation/files/moonstation.performance.glb"
+    },
+    {
+      "name": "mothership_astrum",
+      "url": "mothership_astrum/files/mothership_astrum.performance.glb",
+      "performance_url": "mothership_astrum/files/mothership_astrum.performance.glb"
+    },
+    {
+      "name": "NebulaStation",
+      "url": "NebulaStation/files/NebulaStation.performance.glb",
+      "performance_url": "NebulaStation/files/NebulaStation.performance.glb"
+    },
+    {
+      "name": "north_star",
+      "url": "north_star/files/north_star.performance.glb",
+      "performance_url": "north_star/files/north_star.performance.glb"
+    },
+    {
+      "name": "Ouroboros",
+      "url": "Ouroboros/files/Ouroboros.performance.glb",
+      "performance_url": "Ouroboros/files/Ouroboros.performance.glb"
+    },
+    {
+      "name": "pirate_dutchman",
+      "url": "pirate_dutchman/files/pirate_dutchman.performance.glb",
+      "performance_url": "pirate_dutchman/files/pirate_dutchman.performance.glb"
+    },
+    {
+      "name": "PubbyStation",
+      "url": "PubbyStation/files/PubbyStation.performance.glb",
+      "performance_url": "PubbyStation/files/PubbyStation.performance.glb"
+    },
+    {
+      "name": "starfury_corvette",
+      "url": "starfury_corvette/files/starfury_corvette.performance.glb",
+      "performance_url": "starfury_corvette/files/starfury_corvette.performance.glb"
+    },
+    {
+      "name": "tramstation",
+      "url": "tramstation/files/tramstation.performance.glb",
+      "performance_url": "tramstation/files/tramstation.performance.glb"
+    },
+    {
+      "name": "vaporwave",
+      "url": "vaporwave/files/vaporwave.performance.glb",
+      "performance_url": "vaporwave/files/vaporwave.performance.glb"
+    },
+    {
+      "name": "VoidRaptor",
+      "url": "VoidRaptor/files/VoidRaptor.performance.glb",
+      "performance_url": "VoidRaptor/files/VoidRaptor.performance.glb"
+    },
+    {
+      "name": "wawastation",
+      "url": "wawastation/files/wawastation.performance.glb",
+      "performance_url": "wawastation/files/wawastation.performance.glb"
+    },
+    {
+      "name": "whiteship_blueshift",
+      "url": "whiteship_blueshift/files/whiteship_blueshift.performance.glb",
+      "performance_url": "whiteship_blueshift/files/whiteship_blueshift.performance.glb"
+    }
+  ]
+}

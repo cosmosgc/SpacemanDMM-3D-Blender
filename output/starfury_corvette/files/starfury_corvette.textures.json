@@ -1,0 +1,62 @@
+{
+  "source_dmm": "C:\\Servers\\ss13\\Bubberstation-c\\_maps\\shuttles\\starfury\\starfury_corvette.dmm",
+  "codebase": "C:\\Servers\\ss13\\Bubberstation-c",
+  "map_switch": "map",
+  "cells": 98,
+  "z_levels": [
+    1
+  ],
+  "textured_turfs": 98,
+  "fallback_turfs": 0,
+  "textured_objects": 129,
+  "door_and_window_geometry": 18,
+  "organize_by": "area",
+  "fallback_objects": 1,
+  "objects_skipped": 23,
+  "underfloor_objects": 0,
+  "dmi_files": [
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\effects\\docking_ports.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\canisters.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\chairs.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\clothing\\glasses.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\clothing\\head\\utility.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\clothing\\masks.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\fluff\\map_previews.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\lighting.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\machines\\sec.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\machines\\turret_control.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\machines\\wallmounts.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\mining_zones\\survival_pod.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\railings.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\smooth_structures\\table.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\storage\\closet.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\storage\\medkit.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\storage\\toolbox.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\obj\\weapons\\turrets.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\turf\\decals.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\turf\\floors.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\turf\\shuttle.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\icons\\turf\\walls\\misc_wall.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_skyrat\\modules\\aesthetics\\airlock\\icons\\airlocks\\external\\external.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_skyrat\\modules\\aesthetics\\airlock\\icons\\airlocks\\hatch\\centcom.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_skyrat\\modules\\aesthetics\\blast_door\\icons\\blast_door.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_skyrat\\modules\\aesthetics\\cells\\cell.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_skyrat\\modules\\aesthetics\\rack\\icons\\rack.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_skyrat\\modules\\aesthetics\\storage\\storage.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_skyrat\\modules\\aesthetics\\tools\\tools.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_zubbers\\icons\\turf\\decals\\decals.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_zubbers\\icons\\turf\\floors\\catwalk_plating.dmi",
+    "C:\\Servers\\ss13\\Bubberstation-c\\modular_zubbers\\icons\\turf\\floors\\floors.dmi"
+  ],
+  "fallback_types": {},
+  "fallback_object_types": {
+    "/obj/item/multitool": 1
+  },
+  "scene_lighting": {
+    "sun": true,
+    "area_lights": 1,
+    "game_fixtures": 6,
+    "overview_camera": true
+  },
+  "proxy_geometry_hidden_by_default": true
+}
