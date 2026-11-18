@@ -21,9 +21,11 @@ from mathutils import Vector
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dmm import parse_dmm
 from source_assets import CodebaseAssets, wall_state
+from entity_placement import (
+    COLLECTIONS, DIRECTIONS, classify, entity_direction, entity_label, load_rules, place,
+)
 
 
-WALL_HEIGHT = 2.8
 LEVEL_GAP = 4.0
 OBJECT_HEIGHT = 0.75
 
@@ -62,35 +64,22 @@ def object_kind(path: str) -> str | None:
         "/mapping_helpers/", "/landmark/", "/spawner/", "/abstract/",
     )):
         return None
-    if lowered.startswith("/obj/effect/") and not any(
-        part in lowered for part in ("/turf_decal/", "/effect/decal/")
-    ):
-        return None
-    if "/door" in lowered or "/airlock" in lowered:
+    if any(lowered == prefix or lowered.startswith(prefix + "/") for prefix in (
+        "/obj/machinery/door", "/obj/structure/door", "/obj/structure/mineral_door",
+    )):
         return "door"
-    if "/window" in lowered:
+    if lowered == "/obj/structure/window" or lowered.startswith("/obj/structure/window/"):
         return "window"
-    if "/table" in lowered:
+    if lowered == "/obj/structure/table" or lowered.startswith("/obj/structure/table/"):
         return "table"
     if lowered.startswith("/obj/machinery/"):
         return "machine"
     return "object"
 
 
-def is_underfloor(path: str) -> bool:
-    lowered = path.lower()
-    return (
-        "/machinery/atmospherics/" in lowered
-        or lowered.startswith("/obj/structure/cable")
-        or "/structure/disposalpipe" in lowered
-        or "/machinery/power/cable" in lowered
-    )
-
-
-def entity_name(kind: str, path: str, cell) -> str:
-    parts = [part for part in path.strip("/").split("/") if part]
-    label = " ".join(parts[-2:]).replace("_", " ")
-    return f"{kind.title()} - {label} [{cell.x},{cell.y},{cell.z}]"
+def entity_name(kind: str, path: str, cell, properties=None) -> str:
+    label = entity_label(path, properties)
+    return f"{label[:40]} [{cell.x},{cell.y},{cell.z}]"
 
 
 def set_entity_metadata(obj, path: str, cell, placement: str, info=None, state=None):
@@ -140,7 +129,8 @@ def textured_material(info, opaque=False) -> bpy.types.Material:
         try:
             material.surface_render_method = "DITHERED"
         except (AttributeError, TypeError):
-            pass
+            material.blend_method = "CLIP"
+            material.alpha_threshold = 0.12
     return material
 
 
@@ -192,6 +182,14 @@ class MeshBuilder:
             material_id,
             uv_rect,
         )
+
+    def vertical_plane(self, x, y, z, width, height, material_id, uv_rect, direction):
+        nx, ny = DIRECTIONS[direction]
+        length = math.hypot(nx, ny)
+        rx, ry = -ny / length * width / 2, nx / length * width / 2
+        points = [(x-rx, y-ry, z), (x+rx, y+ry, z),
+                  (x+rx, y+ry, z+height), (x-rx, y-ry, z+height)]
+        self.quad(points, material_id, uv_rect)
 
     def append(self, other):
         base = len(self.vertices)
@@ -261,7 +259,7 @@ def opening_direction(cell, path, mapped_dir, walls, kind):
     return 2
 
 
-def add_opening(builder, x, y, z, tile_size, kind, path, direction, texture, fallback):
+def add_opening(builder, x, y, z, tile_size, wall_height, kind, path, direction, texture, fallback):
     lowered = path.lower()
     glass = kind == "window" or "glass" in lowered or "windoor" in lowered
     full = kind == "window" and ("fulltile" in lowered or "full_tile" in lowered)
@@ -269,12 +267,12 @@ def add_opening(builder, x, y, z, tile_size, kind, path, direction, texture, fal
     front = None
     if texture and not glass:
         info, state = texture
-        material = textured_material(info, opaque=True)
+        material = textured_material(info)
         front = (builder.material_id(material.name, material), info.uv_rect(state, direction))
     half = tile_size * (0.46 if full else 0.49)
     depth = tile_size * (0.06 if glass else 0.09)
-    height = WALL_HEIGHT * 0.91
-    sill = WALL_HEIGHT * 0.21 if kind == "window" and not full else 0.0
+    height = wall_height * 0.91
+    sill = wall_height * 0.21 if kind == "window" and not full else 0.0
     for side in ((1, 2, 4, 8) if full else (direction,)):
         edge = (tile_size / 2 - depth) if kind == "window" else 0
         # Rotate the cross-section into the selected BYOND direction.
@@ -303,7 +301,7 @@ def add_opening(builder, x, y, z, tile_size, kind, path, direction, texture, fal
 
 def build_level(cells, tile_size, level_height, origin_x, origin_y, level_collection,
                 assets, stats, sprite_meshes, performance_batches, performance_only=False,
-                organize_by="type", chunk_size=32, terrain_parts=None):
+                organize_by="type", chunk_size=32, terrain_parts=None, placement_rules=None):
     terrain_collections = {
         "space": new_collection(level_collection, "Space"),
         "floor": new_collection(level_collection, "Floors"),
@@ -323,6 +321,11 @@ def build_level(cells, tile_size, level_height, origin_x, origin_y, level_collec
         )
     }
     underfloor_collection = new_collection(level_collection, "Underfloor")
+    placement_collections = {
+        mode: underfloor_collection if mode == "underfloor" else new_collection(entities_collection, name)
+        for mode, name in COLLECTIONS.items()
+    }
+    floor_surfaces = new_collection(entities_collection, "Floor surfaces")
     proxy_collection = new_collection(level_collection, "Proxy Geometry")
     proxy_collection.hide_viewport = True
     terrain_builders = defaultdict(MeshBuilder)
@@ -344,6 +347,7 @@ def build_level(cells, tile_size, level_height, origin_x, origin_y, level_collec
         for cell in cells if turf_kind(cell.turf) == "wall"
     }
     half = tile_size / 2
+    wall_height = tile_size
     object_stack = Counter()
 
     for cell in cells:
@@ -386,7 +390,7 @@ def build_level(cells, tile_size, level_height, origin_x, origin_y, level_collec
                 uv_rect,
             )
         else:
-            top = bottom + WALL_HEIGHT
+            top = bottom + wall_height
             builder.quad(
                 [(x-half, y-half, top), (x+half, y-half, top),
                  (x+half, y+half, top), (x-half, y+half, top)],
@@ -407,43 +411,69 @@ def build_level(cells, tile_size, level_height, origin_x, origin_y, level_collec
                 if (cell.x + dx, cell.y + dy, cell.z) not in wall_cells:
                     builder.quad(points, face_material, uv_rect)
 
-        # Object sprites are separate, transparent top-down planes, which are
-        # easy to select and preserve the source game's 2D icon appearance.
+        # Placement is resolved once and used by both linked and batched meshes.
         for index, path in enumerate(cell.objects):
+            mapped = cell.object_overrides[index] if cell.object_overrides else {}
+            properties = dict(assets.properties(path))
+            properties.update(mapped)
+            properties["_path"] = path
+            rule = classify(path, properties, placement_rules)
             obj_kind = object_kind(path)
-            if not obj_kind:
+            if not obj_kind or rule.mode == "skip":
                 stats["objects_skipped"] += 1
+                stats["skipped_types"][path] += 1
                 continue
-            below_floor = is_underfloor(path)
+            below_floor = rule.mode == "underfloor"
             if below_floor:
                 stats["underfloor_objects"] += 1
-            if "/machinery/light/" in path.lower():
-                fixture_height = 0.3 if "/light/floor" in path.lower() else WALL_HEIGHT * 0.82
+            mapped_dir = cell.object_directions[index] if cell.object_directions else None
+            direction = entity_direction(path, properties, mapped_dir)
+            stack_key = (cell.x, cell.y, cell.z, rule.mode)
+            layer = object_stack[stack_key]
+            object_stack[stack_key] += 1
+            placement = place(rule, cell, wall_cells, direction, properties, layer)
+            sprite_x, sprite_y = x + placement.x * tile_size, y + placement.y * tile_size
+            sprite_z = bottom + placement.z * tile_size
+            if not placement.wall_found:
+                stats["unmounted_types"][path] += 1
+            stats["placement_counts"][rule.mode] += 1
+            if "/machinery/light" in path.lower():
+                fixture_height = 0.05 if rule.mode == "floor" else 0.82
                 stats["light_fixtures"].add(
-                    (round(x, 4), round(y, 4), round(bottom + fixture_height, 4),
+                    (round(sprite_x, 4), round(sprite_y, 4), round(sprite_z + fixture_height * tile_size, 4),
                      25.0 if "/light/floor" in path.lower() else 90.0)
                 )
-            entity_collection = underfloor_collection if below_floor else entity_collections[obj_kind]
-            obj_texture = assets.texture(path)
-            if obj_kind in ("door", "window"):
-                mapped_dir = cell.object_directions[index] if cell.object_directions else None
-                direction = opening_direction(cell, path, mapped_dir, wall_cells, obj_kind)
+            entity_collection = placement_collections.get(rule.mode, entity_collections[obj_kind])
+            if rule.reason == "walkable floor surface":
+                entity_collection = floor_surfaces
+            elif rule.mode == "upright":
+                entity_collection = entity_collections[obj_kind]
+            elif obj_kind == "table" and rule.mode == "floor":
+                entity_collection = entity_collections["table"]
+            if rule.label:
+                properties["name"] = rule.label
+            obj_texture = assets.turf_texture(path, mapped.get("icon"), mapped.get("icon_state"))
+            if obj_kind in ("door", "window") and not rule.reason.startswith("override:"):
+                entity_collection = entity_collections[obj_kind]
+                direction = opening_direction(cell, path, mapped_dir or properties.get("dir"), wall_cells, obj_kind)
+                direction = entity_direction(path, {}, direction)
+                if direction not in (1, 2, 4, 8):
+                    direction = 4 if direction & 4 else 8
                 fallback = fallback_materials[obj_kind]
-                geometry_texture = obj_kind == "door" and not any(
-                    part in path.lower() for part in ("glass", "windoor")
-                )
+                geometry_texture = obj_kind == "door" and obj_texture is not None
                 texture = obj_texture if geometry_texture else None
                 if performance_batches is not None:
                     add_opening(performance_batches[entity_collection], x, y, bottom,
-                                tile_size, obj_kind, path, direction, texture, fallback)
+                                tile_size, wall_height, obj_kind, path, direction, texture, fallback)
                 if not performance_only:
-                    key = ("opening", path, direction)
+                    key = ("opening", path, direction,
+                           (obj_texture[0].path, obj_texture[1]) if obj_texture else None)
                     if key not in sprite_meshes:
                         opening = MeshBuilder()
-                        add_opening(opening, 0, 0, 0, tile_size, obj_kind, path,
+                        add_opening(opening, 0, 0, 0, tile_size, wall_height, obj_kind, path,
                                     direction, texture, fallback)
                         sprite_meshes[key] = opening.create_mesh(f"{obj_kind.title()} geometry")
-                    obj = bpy.data.objects.new(entity_name(obj_kind, path, cell), sprite_meshes[key])
+                    obj = bpy.data.objects.new(entity_name(obj_kind, path, cell, properties), sprite_meshes[key])
                     obj.location = (x, y, bottom)
                     subgroup(entity_collection, label).objects.link(obj)
                     set_entity_metadata(obj, path, cell, "upright geometry", *(texture or ()))
@@ -455,34 +485,46 @@ def build_level(cells, tile_size, level_height, origin_x, origin_y, level_collec
                 continue
             if obj_texture:
                 info, state = obj_texture
-                ratio = max(info.frame_width, info.frame_height) / 32
-                size = tile_size * min(max(ratio, 0.65), 2.0)
-                stack_key = (cell.x, cell.y, cell.z)
-                layer = object_stack[stack_key]
-                object_stack[stack_key] += 1
-                sprite_z = bottom - 0.04 - layer * 0.002 if below_floor else bottom + 0.015 + layer * 0.002
+                width = tile_size * info.frame_width / 32 * rule.scale
+                height = tile_size * info.frame_height / 32 * rule.scale
+                flat_sprite = rule.mode in ("floor", "underfloor")
+                uv_rect = info.uv_rect(state, direction)
                 if performance_batches is not None:
                     batch = performance_batches[entity_collection]
                     slot = batch.material_id(info.path, textured_material(info))
-                    batch.plane(x, y, sprite_z, size, size, slot, info.uv_rect(state))
+                    if flat_sprite:
+                        batch.plane(sprite_x, sprite_y, sprite_z, width, height, slot, uv_rect)
+                    else:
+                        batch.vertical_plane(sprite_x, sprite_y, sprite_z, width, height, slot,
+                                             uv_rect, placement.direction)
                 if not performance_only:
-                    key = (info.path, state)
+                    key = (info.path, state, direction, placement.direction, flat_sprite, rule.scale)
                     if key not in sprite_meshes:
                         sprite = MeshBuilder()
                         slot = sprite.material_id(info.path, textured_material(info))
-                        sprite.plane(0, 0, 0, size, size, slot, info.uv_rect(state))
+                        if flat_sprite:
+                            sprite.plane(0, 0, 0, width, height, slot, uv_rect)
+                        else:
+                            sprite.vertical_plane(0, 0, 0, width, height, slot,
+                                                  uv_rect, placement.direction)
                         sprite_meshes[key] = sprite.create_mesh(f"{info.path.stem} - {state}")
                     obj = bpy.data.objects.new(
-                        entity_name(obj_kind, path, cell), sprite_meshes[key]
+                        entity_name(obj_kind, path, cell, properties), sprite_meshes[key]
                     )
                     # Keep each placement independently editable. The linked
                     # mesh is shared until explicitly made single-user.
-                    obj.location = (x, y, sprite_z)
+                    obj.location = (sprite_x, sprite_y, sprite_z)
+                    obj["DMM direction"] = direction
                     subgroup(entity_collection, label).objects.link(obj)
                     set_entity_metadata(
-                        obj, path, cell, "below floor" if below_floor else "on floor",
+                        obj, path, cell, rule.mode,
                         info, state,
                     )
+                    obj["Display name"] = entity_label(path, properties)
+                    obj["Placement rule"] = rule.reason
+                    obj["Wall contact found"] = placement.wall_found
+                    obj["Facing direction"] = placement.direction
+                    obj["Walkable surface"] = rule.reason == "walkable floor surface"
                 stats["textured_objects"] += 1
                 stats["dmi_files"].add(str(info.path))
             else:
@@ -492,18 +534,29 @@ def build_level(cells, tile_size, level_height, origin_x, origin_y, level_collec
                     targets.append(sprite_builder)
                 if performance_batches is not None:
                     targets.append(performance_batches[proxy_collection])
-                box = (
-                    x - tile_size * 0.3, y - tile_size * 0.3, bottom,
-                    tile_size * 0.6, tile_size * 0.6, OBJECT_HEIGHT,
-                )
+                width = depth = tile_size * 0.6 * rule.scale
+                height = tile_size * OBJECT_HEIGHT * rule.scale
+                if rule.mode in ("floor", "underfloor"):
+                    height = tile_size * 0.002
+                elif rule.mode == "wall":
+                    if placement.direction in (1, 2):
+                        depth = tile_size * 0.002
+                    else:
+                        width = tile_size * 0.002
+                box = (sprite_x - width / 2, sprite_y - depth / 2, sprite_z,
+                       width, depth, height)
                 for target in targets:
                     slot = target.material_id(obj_kind, fallback_materials[obj_kind])
                     target.box(*box, slot)
                 if not performance_only:
                     obj = sprite_builder.create_object(
-                        f"Proxy - {entity_name(obj_kind, path, cell)}", subgroup(proxy_collection, label)
+                        f"{entity_name(obj_kind, path, cell, properties)} - proxy", subgroup(proxy_collection, label)
                     )
-                    set_entity_metadata(obj, path, cell, "proxy box")
+                    set_entity_metadata(obj, path, cell, rule.mode)
+                    obj["Display name"] = entity_label(path, properties)
+                    obj["Placement rule"] = rule.reason
+                    obj["Wall contact found"] = placement.wall_found
+                    obj["DMM direction"] = direction
                 stats["fallback_objects"] += 1
                 stats["fallback_object_types"][path] += 1
 
@@ -562,7 +615,7 @@ def add_scene_lighting(root, map_width, map_height, tile_size, level_heights, fi
     camera_data.ortho_scale = max(map_width, map_height) * 1.35
     camera = bpy.data.objects.new("Map Overview", camera_data)
     camera_collection.objects.link(camera)
-    max_height = max(level_heights, default=0) + WALL_HEIGHT
+    max_height = max(level_heights, default=0) + tile_size
     distance = max(map_width, map_height) * 0.85
     target = Vector((center_x, center_y, max_height / 2))
     camera.location = (
@@ -625,12 +678,15 @@ def arguments():
     parser.add_argument("--organize-by", choices=("type", "area", "chunk"), default="type",
                         help="Optional area or chunk subcollections in high-fidelity exports")
     parser.add_argument("--chunk-size", type=int, default=32, help="Chunk width/depth in map tiles")
+    parser.add_argument("--placement-rules", default=str(Path(__file__).with_name("placement_rules.json")),
+                        help="JSON type-prefix overrides for entity placement")
     return parser.parse_args(argv)
 
 
 def main():
     started = perf_counter()
     args = arguments()
+    placement_rules = load_rules(args.placement_rules)
     high_blend = not args.performance_only
     perf_blend = args.performance_mode or args.performance_only
     glb_mode = "none" if args.no_glb else args.glb
@@ -689,6 +745,9 @@ def main():
         "fallback_types": Counter(),
         "fallback_object_types": Counter(),
         "light_fixtures": set(),
+        "placement_counts": Counter(),
+        "unmounted_types": Counter(),
+        "skipped_types": Counter(),
     }
     level_heights = []
     sprite_meshes = {}
@@ -714,6 +773,7 @@ def main():
             organize_by=layout,
             chunk_size=args.chunk_size,
             terrain_parts=terrain_parts,
+            placement_rules=placement_rules,
         )
     if not build_high:
         install_entity_batches(batches)
@@ -734,6 +794,11 @@ def main():
         "textured_objects": stats["textured_objects"],
         "door_and_window_geometry": stats["geometry_objects"],
         "organize_by": layout,
+        "chunk_size": args.chunk_size,
+        "placement_counts": dict(stats["placement_counts"]),
+        "wall_mounts_without_support": dict(stats["unmounted_types"]),
+        "skipped_types": dict(stats["skipped_types"]),
+        "placement_rules": str(Path(args.placement_rules).resolve()),
         "fallback_objects": stats["fallback_objects"],
         "objects_skipped": stats["objects_skipped"],
         "underfloor_objects": stats["underfloor_objects"],
@@ -766,6 +831,7 @@ def main():
                 filepath=str(output / f"{name}.glb"),
                 export_format="GLB",
                 use_selection=False,
+                export_extras=True,
             )
             if 'FINISHED' not in result:
                 raise RuntimeError(f"GLB export failed for {name}")

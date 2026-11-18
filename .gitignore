@@ -4,9 +4,10 @@ __pycache__/
 .venv/
 venv/
 
-# Blender autosave/backup copies (the saved .blend projects are tracked)
+# Blender autosave/backup copies and generated map projects
 *.blend1
 *.blend2
+output/**/*.blend*
 
 # Rust prototype build output
 dmm3d/target/

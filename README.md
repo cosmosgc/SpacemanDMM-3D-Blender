@@ -10,6 +10,11 @@ Statbus or Renderbus.
 - Python 3.10+ (for parsing and tests)
 - Blender 3.6+ (for generating `.blend` and `.glb` files)
 
+On Windows, run `install_dependencies.bat` to install missing Python/Blender
+requirements through `winget`. The project has no pip packages; it uses Python's
+standard library. Blender and Python can also be installed manually. The browser
+viewer needs an internet connection to load Three.js from jsDelivr.
+
 ## Generate a map
 
 ### Desktop map picker
@@ -33,6 +38,9 @@ batched map directly without regenerating existing high-fidelity files. Choose
 For high-fidelity exports, **Organize by** keeps each z-level and type
 collection and optionally splits its terrain and entities into subcollections
 by **Area** (the DMM area path) or **Chunk** (32 × 32 tiles by default).
+**Chunk size (tiles)** changes that size and is saved between sessions.
+**Placement rules** selects a JSON file for codebase-specific placement exceptions
+(defaults to `placement_rules.json` in this project).
 The map tree shows source size, source modification time, and available exports
 with their latest modification time. **GLB files** independently selects
 high fidelity, performance, both, or none. The default matches **Blender files**.
@@ -55,7 +63,8 @@ blender --background --factory-startup --python-exit-code 1 --python generate_bl
 `--dmm` and `--codebase` are required. Files are placed under
 `<output-root>/<map-name>/files/`, e.g. `output\loopstation\files\`.
 That folder contains the Blender project, GLB export, and texture-resolution report.
-`--tile-size` sets the width and depth of each game tile (default: 1 Blender unit).
+`--tile-size` sets the width, depth, and wall height of each game tile (default:
+1 Blender unit), preserving square wall textures.
 The resolver defaults to the second (`map`) argument of `MAP_SWITCH`, matching
 map-preview behavior; use `--map-switch compile` to select the first argument.
 Use `--performance-mode` to also create separate `<map>.performance.blend` and
@@ -120,9 +129,15 @@ Get-ChildItem "C:\ss13\codebase\_maps" -Filter *.dmm -Recurse
   overrides, and select connected junction frames when available.
 - A selectable collection hierarchy per z-level: `Space`, `Floors`, `Plating`,
   `Asteroid`, `Walls`, and `Entities` (`Doors`, `Windows`, `Tables`, `Machines`,
-  `Objects`), plus `Underfloor` and `Proxy Geometry`.
-- Each mapped entity is an individual, named Blender object with its DMM path
-  and coordinates stored as custom properties. Doors are upright slabs (with DMI
+  `Objects`, `Wall Fixtures`, `Floor Fixtures`, `Floor surfaces`), plus `Underfloor`
+  and `Proxy Geometry`.
+- Each mapped entity is an individual Blender object named after its in-game
+  display name (including mapped name overrides), followed by variant/coordinates,
+  rather than just suffixes like `hidden layer2`. Its full name, DMM path,
+  direction, placement rule, and wall-contact status are stored as custom properties.
+  Use **High fidelity** or **Both versions** for individually selectable entities.
+  Performance meshes are merged and cannot expose individual entity names.
+- Doors are upright slabs (with DMI
   textures where available); windows and glass doors use solid frames with
   translucent panes. These are static models, oriented from mapped directions
   where available. Other resolved sprites are transparent planes, and unresolved
@@ -133,8 +148,21 @@ Get-ChildItem "C:\ss13\codebase\_maps" -Filter *.dmm -Recurse
   selectable entities and metadata.
 - `Proxy Geometry` starts hidden in the viewport; enable it in the Outliner if
   you want to inspect fallback boxes.
-- Pipes, cables, and disposal pipes are placed slightly below floor level in
-  `Underfloor`; hide the `Floors` collection to inspect them.
+- Hidden pipes, cables, ducts, and disposal pipes are horizontal below floor level
+  in `Underfloor`; hide `Floors` and `Plating` to inspect them. Pipe network
+  layers 1–5 occupy distinct depths. Exposed pipes, gas filters, pumps, vents,
+  and scrubbers are horizontal surface fixtures.
+- Lattice, lattice catwalks, other catwalks, and grating are horizontal
+  `Floor surfaces`, also recognized by browser walk-mode collision.
+- Decals, holopads, tables, conveyors, and shuttle engine footprints sit on the
+  ground. Portable canisters, shuttle computers, and ordinary standing objects
+  remain upright; matching is by type family rather than words like `engine`.
+- Air/fire alarms, intercoms, APCs, posters, signs, wallpapers, wall lights, status
+  displays, and telescreens attach to nearby wall faces. A fixture mapped inside
+  a wall is moved to an exposed face. Directional helpers and mapped pixel offsets
+  choose the mounting side; the sprite faces out into the room.
+- Overlapping floor sprites are separated vertically; upright and wall-mounted
+  sprites are separated along their surface normal to avoid coplanar flickering.
 - A sun, one area light per z-level, point lights for mapped light fixtures, and
   an orthographic overview camera.
 
@@ -145,11 +173,47 @@ atlas. This follows the same asset source used by Renderbus/SpacemanDMM: the
 codebase's `.dmi` files, rather than a remote texture service.
 
 This is still a blockout, not a full BYOND appearance renderer. Dynamic icon
-states, full BYOND smoothing rules, overlays, pixel offsets, and accurate 3D object
-models are not reconstructed. Missing turf icons use fallback colors; check
+states, full BYOND smoothing rules, runtime overlays/transforms, and accurate 3D
+object models are not reconstructed. Static names, icon/state overrides, direction,
+and pixel offsets are resolved; wall-normal offsets are snapped to wall contact.
+Missing turf icons use fallback colors; check
 `<map>.textures.json` for missing types. The Rust prototype in `dmm3d/` informed
 the object proxies and wall-face culling, while this app keeps Blender as the
 native scene builder and textured GLB exporter.
+
+## Fixing a codebase-specific placement
+
+Edit `placement_rules.json` or choose a different file in the launcher:
+
+```json
+{
+  "/obj/machinery/custom_screen": {
+    "mode": "wall",
+    "label": "Wall screen"
+  },
+  "/obj/structure/custom_pad": {
+    "mode": "floor"
+  },
+  "/obj/machinery/custom_screen/small": {
+    "mode": "wall",
+    "height": 0.25,
+    "scale": 0.5
+  }
+}
+```
+
+These paths are examples—use the entity's **DMM type** custom property. The longest
+matching type prefix wins, including its descendants. Supported modes are
+`wall`, `floor`, `underfloor`, `upright`, and `skip`. `height` is the sprite's bottom
+height in tiles; `scale` multiplies its original DMI dimensions. `label` changes
+its Outliner display name. CLI: `--placement-rules path/to/rules.json`.
+
+After changing rules or updating the exporter, regenerate the desired Blender/GLB
+variants. Existing exports do not change automatically. In `<map>.textures.json`,
+inspect `placement_counts`, `wall_mounts_without_support`, `skipped_types`, and
+`fallback_object_types` to find cases needing attention. A wall fixture with no
+adjacent supporting wall retains its requested edge placement and is reported;
+the exporter does not invent a distant wall.
 
 ## Parser tests
 
@@ -158,4 +222,11 @@ The parser has no third-party Python dependencies:
 ```powershell
 python -m unittest discover -s tests
 node --test tests/test_viewer_resources.mjs
+```
+
+For actual Blender geometry checks (wall contact, horizontal networks, floor
+surfaces, face normals, and matching high-fidelity/performance geometry):
+
+```powershell
+blender --background --factory-startup --python-exit-code 1 --python tests/blender_placement_check.py
 ```

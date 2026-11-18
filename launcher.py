@@ -14,6 +14,7 @@ from pathlib import Path
 from time import monotonic
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+from entity_placement import load_rules
 
 
 PROJECT_DIR = Path(__file__).resolve().parent
@@ -116,10 +117,16 @@ class MapLauncher(tk.Tk):
         self.codebase_var = tk.StringVar(value=saved.get("codebase") or os.environ.get("SS13_CODEBASE", ""))
         self.blender_var = tk.StringVar(value=saved.get("blender") or find_blender())
         self.output_var = tk.StringVar(value=saved.get("output") or str(DEFAULT_OUTPUT))
+        self.placement_var = tk.StringVar(
+            value=saved.get("placement_rules") or str(PROJECT_DIR / "placement_rules.json")
+        )
         self.filter_var = tk.StringVar()
         self.switch_var = tk.StringVar(value=remembered(saved, "map_switch", MAP_SWITCHES, "map"))
         self.export_var = tk.StringVar(value=remembered(saved, "blender_files", BLENDER_MODES, "High fidelity"))
         self.layout_var = tk.StringVar(value=remembered(saved, "organize_by", LAYOUT_MODES, "Type"))
+        self.chunk_size_var = tk.StringVar(value=saved.get("chunk_size", "32"))
+        if not self.chunk_size_var.get().isdigit() or int(self.chunk_size_var.get()) <= 0:
+            self.chunk_size_var.set("32")
         self.glb_var = tk.StringVar(value=remembered(saved, "glb_files", tuple(GLB_MODES), "Match Blender"))
         self.status_var = tk.StringVar(value="Select a map to begin.")
         self.progress_var = tk.StringVar(value="Ready")
@@ -134,9 +141,11 @@ class MapLauncher(tk.Tk):
             "codebase": self.codebase_var.get(),
             "blender": self.blender_var.get(),
             "output": self.output_var.get(),
+            "placement_rules": self.placement_var.get(),
             "map_switch": self.switch_var.get(),
             "blender_files": self.export_var.get(),
             "organize_by": self.layout_var.get(),
+            "chunk_size": self.chunk_size_var.get(),
             "glb_files": self.glb_var.get(),
         })
 
@@ -154,6 +163,7 @@ class MapLauncher(tk.Tk):
         self._path_row(paths, 0, "Codebase", self.codebase_var, self._browse_codebase)
         self._path_row(paths, 1, "Blender", self.blender_var, self._browse_blender)
         self._path_row(paths, 2, "Output root", self.output_var, self._browse_output)
+        self._path_row(paths, 3, "Placement rules", self.placement_var, self._browse_placement_rules)
 
         maps_frame = ttk.LabelFrame(self, text="Choose a DMM map", padding=10)
         maps_frame.grid(row=1, column=0, sticky="nsew", padx=12, pady=6)
@@ -218,6 +228,13 @@ class MapLauncher(tk.Tk):
             values=LAYOUT_MODES, state="readonly", width=24,
         )
         layout.grid(row=2, column=1, sticky="w", pady=(7, 0))
+        ttk.Label(controls, text="Chunk size (tiles)").grid(
+            row=2, column=2, sticky="e", padx=(12, 6), pady=(7, 0)
+        )
+        self.chunk_size_input = ttk.Spinbox(
+            controls, textvariable=self.chunk_size_var, from_=1, to=1024, increment=1, width=7
+        )
+        self.chunk_size_input.grid(row=2, column=3, sticky="w", pady=(7, 0))
         ttk.Label(controls, text="GLB files").grid(row=3, column=0, sticky="w", pady=(7, 0))
         glb_mode = ttk.Combobox(
             controls, textvariable=self.glb_var, values=tuple(GLB_MODES),
@@ -229,9 +246,14 @@ class MapLauncher(tk.Tk):
             high = (self.export_var.get() != "Performance only (fast)"
                     or GLB_MODES[self.glb_var.get()] in ("high", "both"))
             layout.configure(state="readonly" if high else "disabled")
+            self.chunk_size_input.configure(
+                state="normal" if high and self.layout_var.get().startswith("Chunk") else "disabled"
+            )
 
         export_mode.bind("<<ComboboxSelected>>", update_layout)
         glb_mode.bind("<<ComboboxSelected>>", update_layout)
+        layout.bind("<<ComboboxSelected>>", update_layout)
+        update_layout(None)
         self.generate_button = ttk.Button(
             controls, text="Generate selected map", command=self.generate
         )
@@ -299,6 +321,15 @@ class MapLauncher(tk.Tk):
         )
         if selected:
             self.output_var.set(selected)
+
+    def _browse_placement_rules(self):
+        selected = filedialog.askopenfilename(
+            title="Select entity placement rules",
+            initialdir=str(PROJECT_DIR),
+            filetypes=(("Placement rules", "*.json"),),
+        )
+        if selected:
+            self.placement_var.set(selected)
 
     def _codebase(self) -> Path | None:
         value = self.codebase_var.get().strip()
@@ -482,6 +513,17 @@ class MapLauncher(tk.Tk):
             command.append("--performance-only")
         command.extend(("--glb", GLB_MODES[self.glb_var.get()]))
         command.extend(("--organize-by", self.layout_var.get().split()[0].lower()))
+        rules_path = Path(self.placement_var.get()).expanduser()
+        try:
+            load_rules(rules_path)
+        except (OSError, ValueError) as error:
+            messagebox.showerror("Invalid placement rules", str(error))
+            return
+        command.extend(("--placement-rules", str(rules_path)))
+        if not self.chunk_size_var.get().isdigit() or int(self.chunk_size_var.get()) <= 0:
+            messagebox.showerror("Invalid chunk size", "Chunk size must be a positive whole number.")
+            return
+        command.extend(("--chunk-size", self.chunk_size_var.get()))
         self.running = True
         self.cancel_requested = False
         self.started = monotonic()

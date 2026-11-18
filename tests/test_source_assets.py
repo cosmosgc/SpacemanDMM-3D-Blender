@@ -1,5 +1,6 @@
 import sys
 import unittest
+import tempfile
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -49,6 +50,35 @@ class TextureCacheTests(unittest.TestCase):
              patch.object(assets, "_load_texture") as load:
             assets.turf_texture("/turf/closed/wall", "icons/new.dmi", "")
             load.assert_called_once_with(assets.root / "icons/new.dmi", "")
+
+
+class SourceDefaultsTests(unittest.TestCase):
+    def test_parent_type_helpers_and_procedure_boundaries(self):
+        source = '''/obj/machinery/airalarm
+\tname = "air alarm"
+\ticon = 'icons/wall.dmi'
+\ticon_state = "alarm"
+/obj/machinery/airalarm/update_name()
+\tname = "temporary runtime name"
+/obj/custom_panel
+\tparent_type = /obj/machinery/airalarm
+\tpixel_y = 4
+/obj/custom_panel/Initialize(mapload)
+\tpixel_y = 99
+MAPPING_DIRECTIONAL_HELPERS(/obj/custom_panel, 27)
+'''
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "tgstation.dme").write_text('#include "test.dm"')
+            (root / "test.dm").write_text(source)
+            assets = CodebaseAssets(root)
+            values = assets.properties("/obj/custom_panel/directional/north")
+            self.assertEqual(values["name"], "air alarm")
+            self.assertEqual(values["icon_state"], "alarm")
+            self.assertEqual(values["pixel_y"], "27")
+            self.assertEqual(values["dir"], "1")
+            self.assertIn("/obj/machinery/airalarm", values["_type_chain"])
+            self.assertEqual(assets.properties("/obj/custom_panel")["pixel_y"], "4")
 
 
 class WallStateTests(unittest.TestCase):

@@ -234,7 +234,11 @@
         if (!object.isMesh) return;
         // GLTFLoader may put material primitives under a named group.
         for (let node = object; node && node !== model; node = node.parent) {
-          const match = /^(floor|plating|asteroid|wall)[ _]tiles(?:$|[_. ])/i.exec(node.name);
+          if (node.userData["Walkable surface"]) {
+            terrain.floor.push(object);
+            break;
+          }
+          const match = /^(floor|plating|asteroid|wall)[ _](?:tiles|surfaces)(?:$|[_. ])/i.exec(node.name);
           if (!match) continue;
           terrain[match[1].toLowerCase()].push(object);
           break;

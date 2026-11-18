@@ -47,6 +47,19 @@ class DmmParserTests(unittest.TestCase):
         self.assertEqual(wall.turf_icon, "icons/wall.dmi")
         self.assertEqual(wall.turf_icon_state, "stripe;yellow")
 
+    def test_preserves_entity_appearance_and_placement_overrides(self):
+        text = FIXTURE.replace("dir = 4", """dir = NORTHWEST; name = "Alarm; custom";
+            pixel_x = -32; pixel_y = 5; icon = 'icons/fixture.dmi';
+            icon_state = "custom"; piping_layer = 2""")
+        wall = next(cell for cell in parse_dmm_text(text).cells if cell.objects)
+        self.assertEqual(wall.object_directions, (9,))
+        values = wall.object_overrides[0]
+        self.assertEqual(values["name"], "Alarm; custom")
+        self.assertEqual(values["pixel_x"], "-32")
+        self.assertEqual(values["icon"], "icons/fixture.dmi")
+        self.assertEqual(values["icon_state"], "custom")
+        self.assertEqual(values["piping_layer"], "2")
+
 
 if __name__ == "__main__":
     unittest.main()

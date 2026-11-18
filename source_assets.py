@@ -11,7 +11,11 @@ import zlib
 
 _INCLUDE = re.compile(r'^\s*#include\s+"([^"]+)"', re.IGNORECASE)
 _TYPE = re.compile(r"^(/(?:turf|obj)(?:/[A-Za-z0-9_]+)*)\s*(?://.*)?$")
-_FIELD = re.compile(r"^(icon|icon_state|base_icon_state|parent_type)\s*=\s*(.*?)\s*$")
+_FIELD = re.compile(
+    r"^(?:var/)?(icon|icon_state|base_icon_state|parent_type|name|dir|pixel_x|pixel_y|"
+    r"pixel_z|layer|plane|piping_layer|hide|invisibility)\s*=\s*(.*?)\s*$"
+)
+_DIRECTIONAL = re.compile(r"^MAPPING_DIRECTIONAL_HELPERS\((/[\w/]+),\s*([^)]*)\)")
 _STRING = re.compile(r'^"((?:\\.|[^"\\])*)"$')
 _DMI_PATH = re.compile(r"""['"]([^'"]+\.dmi)['"]""", re.IGNORECASE)
 _FIELD_VALUE = re.compile(r'^\s*(?:state|width|height|dirs|frames)\s*=\s*(.*?)\s*$')
@@ -222,6 +226,7 @@ class CodebaseAssets:
         self.dmi_cache: dict[Path, DmiInfo] = {}
         self.texture_cache: dict[str, tuple[DmiInfo, str] | None] = {}
         self.turf_texture_cache = {}
+        self.properties_cache = {}
         self._index_codebase()
 
     def _included_files(self) -> list[Path]:
@@ -264,18 +269,33 @@ class CodebaseAssets:
                 continue
             current_type = None
             for line in lines:
+                helper = _DIRECTIONAL.match(line)
+                if helper:
+                    base, offset = helper.groups()
+                    for suffix, direction, axis, sign in (
+                        ("north", 1, "pixel_y", 1), ("south", 2, "pixel_y", -1),
+                        ("east", 4, "pixel_x", 1), ("west", 8, "pixel_x", -1),
+                    ):
+                        values = self.types.setdefault(f"{base}/directional/{suffix}", {})
+                        values.update(dir=str(direction), mount_direction=str(direction))
+                        if offset.strip().isdigit():
+                            values[axis] = str(int(offset) * sign)
                 declaration = _TYPE.match(line)
                 if declaration:
                     current_type = declaration.group(1)
                     self.types.setdefault(current_type, {})
                     continue
+                # Do not treat assignments inside procedures or other datum
+                # declarations as defaults of the preceding object type.
+                if line and not line[0].isspace() and not line.startswith(("//", "#")):
+                    current_type = None
                 if current_type is None or not line.startswith("\t") or line.startswith("\t\t"):
                     continue
                 field = _FIELD.match(line.lstrip("\t").strip())
                 if not field:
                     continue
                 name, raw_value = field.groups()
-                value = _map_value(raw_value, self.map_switch)
+                value = _map_value(raw_value.split(" //", 1)[0].strip(), self.map_switch)
                 if name == "icon":
                     icon_match = _DMI_PATH.search(value)
                     if icon_match:
@@ -284,8 +304,13 @@ class CodebaseAssets:
                     literal = _literal(value)
                     if literal is not None:
                         self.types[current_type][name] = literal
+                    elif name not in ("icon_state", "base_icon_state", "name"):
+                        self.types[current_type][name] = value
 
-    def appearance(self, type_path: str) -> tuple[Path, str] | None:
+    def properties(self, type_path: str) -> dict[str, str]:
+        """Resolve static defaults, including explicit DM parent_type links."""
+        if type_path in self.properties_cache:
+            return self.properties_cache[type_path]
         chain: list[str] = []
         current = type_path
         seen: set[str] = set()
@@ -298,6 +323,12 @@ class CodebaseAssets:
         effective: dict[str, str] = {}
         for type_name in reversed(chain):
             effective.update(self.types.get(type_name, {}))
+        effective["_type_chain"] = "|".join(chain)
+        self.properties_cache[type_path] = effective
+        return effective
+
+    def appearance(self, type_path: str) -> tuple[Path, str] | None:
+        effective = self.properties(type_path)
         icon = effective.get("icon")
         state = effective.get("icon_state") or effective.get("base_icon_state") or ""
         if not icon:

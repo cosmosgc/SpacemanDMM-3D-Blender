@@ -18,6 +18,7 @@ class Cell:
     turf_icon_state: str | None = None
     area: str | None = None
     object_directions: tuple[int | None, ...] = ()
+    object_overrides: tuple[dict[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -122,17 +123,29 @@ def _parse_symbols(text: str):
             raise ValueError(f"Symbol {match.group(1)!r} has no turf entry")
         objects = []
         directions = []
+        object_overrides = []
         for path, entry in zip(paths, entries):
             if not path.startswith("/obj/"):
                 continue
             objects.append(path)
-            direction = _overrides(entry).get("dir")
-            directions.append(int(direction) if direction in ("1", "2", "4", "8") else None)
+            fields = _overrides(entry)
+            object_overrides.append({
+                key: _literal_override(value) if _literal_override(value) is not None else value
+                for key, value in fields.items()
+                if key in ("name", "icon", "icon_state", "dir", "pixel_x", "pixel_y",
+                           "pixel_z", "layer", "plane", "piping_layer", "hide", "invisibility")
+            })
+            direction = fields.get("dir")
+            direction = {"NORTH": "1", "SOUTH": "2", "EAST": "4", "WEST": "8",
+                         "NORTHEAST": "5", "NORTHWEST": "9",
+                         "SOUTHEAST": "6", "SOUTHWEST": "10"}.get(direction, direction)
+            directions.append(int(direction) if direction in ("1", "2", "4", "8", "5", "6", "9", "10") else None)
         overrides = _overrides(entries[turf_index])
         area = next((path for path in paths if path.startswith("/area/") or path == "/area"), None)
         symbols[match.group(1)] = (
             paths[turf_index], tuple(objects), _literal_override(overrides.get("icon", "")),
             _literal_override(overrides.get("icon_state", "")), area, tuple(directions),
+            tuple(object_overrides),
         )
     if not symbols:
         raise ValueError("No DMM symbol definitions found")
@@ -169,7 +182,7 @@ def parse_dmm_text(text: str) -> DmmMap:
                     raise ValueError(
                         f"Map at ({origin_x},{origin_y},{z}) uses unknown symbol {key!r}"
                     )
-                turf, objects, turf_icon, turf_icon_state, area, directions = symbols[key]
+                turf, objects, turf_icon, turf_icon_state, area, directions, overrides = symbols[key]
                 cells.append(
                     Cell(
                         x=origin_x + column // symbol_width,
@@ -181,6 +194,7 @@ def parse_dmm_text(text: str) -> DmmMap:
                         turf_icon_state=turf_icon_state,
                         area=area,
                         object_directions=directions,
+                        object_overrides=overrides,
                     )
                 )
     if not found_blocks:
